@@ -2756,11 +2756,11 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
         // do character spell book cleanup (all characters)
         if (!IsInWorld() && !learning)                      // spell load case
         {
-            sLog.outError("Player::addSpell: nonexistent in SpellStore spell #%u request, deleting for all characters in `character_spell`.", spell_id);
+            sLog.outDebug("Player::addSpell: nonexistent in SpellStore spell #%u request, deleting for all characters in `character_spell`.", spell_id);
             CharacterDatabase.PExecute("DELETE FROM character_spell WHERE spell = '%u'", spell_id);
         }
         else
-            sLog.outError("Player::addSpell: nonexistent in SpellStore spell #%u request.", spell_id);
+            sLog.outDebug("Player::addSpell: nonexistent in SpellStore spell #%u request.", spell_id);
 
         return false;
     }
@@ -21023,7 +21023,7 @@ void Player::AddCooldown(SpellEntry const& spellEntry, ItemPrototype const* item
         auto& cdData = cdDataItr->second;
         if (!cdData->IsPermanent())
         {
-            sLog.outError("Player::AddCooldown> Spell(%u) try to add and already existing cooldown?", spellEntry.Id);
+            sLog.outDebug("Player::AddCooldown> Spell(%u) try to add and already existing cooldown?", spellEntry.Id);
             return;
         }
         m_cooldownMap.erase(cdDataItr);
