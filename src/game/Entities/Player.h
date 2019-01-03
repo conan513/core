@@ -40,6 +40,7 @@
 #include "Chat/Chat.h"
 #include "Server/SQLStorages.h"
 #include "Loot/LootMgr.h"
+#include "Cinematics/CinematicMgr.h"
 
 #include<vector>
 
@@ -866,6 +867,8 @@ class TradeData
 class Player : public Unit
 {
         friend class WorldSession;
+        friend class CinematicMgr;
+
         friend void Item::AddToUpdateQueueOf(Player* player);
         friend void Item::RemoveFromUpdateQueueOf(Player* player);
     public:
@@ -901,7 +904,7 @@ class Player : public Unit
 
         bool Create(uint32 guidlow, const std::string& name, uint8 race, uint8 class_, uint8 gender, uint8 skin, uint8 face, uint8 hairStyle, uint8 hairColor, uint8 facialHair, uint8 outfitId);
 
-        void Update(uint32 update_diff, uint32 p_time) override;
+        void Update(const uint32 diff) override;
 
         static bool BuildEnumData(QueryResult* result,  WorldPacket& p_data);
 
@@ -954,7 +957,7 @@ class Player : public Unit
         }
 
 
-        void GiveXP(uint32 xp, Unit* victim);
+        void GiveXP(uint32 xp, Creature* victim, float groupRate = 1.f);
         void GiveLevel(uint32 level);
 
         void InitStatsForLevel(bool reapplyMods = false);
@@ -1300,7 +1303,7 @@ class Player : public Unit
 
         void SendQuestCompleteEvent(uint32 quest_id) const;
         void SendQuestReward(Quest const* pQuest, uint32 XP) const;
-        void SendQuestFailed(uint32 quest_id) const;
+        void SendQuestFailed(uint32 quest_id, uint32 reason = 0) const;
         void SendQuestTimerFailed(uint32 quest_id) const;
         void SendCanTakeQuestResponse(uint32 msg) const;
         void SendQuestConfirmAccept(Quest const* pQuest, Player* pReceiver) const;
@@ -1453,12 +1456,13 @@ class Player : public Unit
         void SendProficiency(ItemClass itemClass, uint32 itemSubclassMask) const;
         void SendInitialSpells() const;
         bool addSpell(uint32 spell_id, bool active, bool learning, bool dependent, bool disabled);
-        void learnSpell(uint32 spell_id, bool dependent);
+        void learnSpell(uint32 spell_id, bool dependent, bool talent = false);
         void removeSpell(uint32 spell_id, bool disabled = false, bool learn_low_rank = true, bool sendUpdate = true);
         void resetSpells();
         void learnDefaultSpells();
         void learnQuestRewardedSpells();
         void learnQuestRewardedSpells(Quest const* quest);
+        void learnSkillRewardedSpells(uint16 skillId, uint16 value);
         void learnSpellHighRank(uint32 spellid);
 
         uint32 GetFreeTalentPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS1); }
@@ -1573,6 +1577,8 @@ class Player : public Unit
 
         void UpdateClientAuras();
         void SendPetBar();
+        void StartCinematic();
+        void StopCinematic();
         bool UpdateSkill(uint32 skill_id, uint32 step);
         bool UpdateSkillPro(uint16 SkillId, int32 Chance, uint32 step);
 
@@ -1580,10 +1586,10 @@ class Player : public Unit
         bool UpdateGatherSkill(uint32 SkillId, uint32 SkillValue, uint32 RedLevel, uint32 Multiplicator = 1);
         bool UpdateFishingSkill();
 
-        uint32 GetBaseDefenseSkillValue() const { return GetBaseSkillValue(SKILL_DEFENSE); }
+        uint32 GetBaseDefenseSkillValue() const { return GetSkillValueBase(SKILL_DEFENSE); }
         uint32 GetBaseWeaponSkillValue(WeaponAttackType attType) const;
 
-        uint32 GetPureDefenseSkillValue() const { return GetPureSkillValue(SKILL_DEFENSE); }
+        uint32 GetPureDefenseSkillValue() const { return GetSkillValuePure(SKILL_DEFENSE); }
         uint32 GetPureWeaponSkillValue(WeaponAttackType attType) const;
 
         float GetHealthBonusFromStamina() const;
@@ -1604,7 +1610,7 @@ class Player : public Unit
         void UpdateRating(CombatRating cr);
         void UpdateAllRatings();
 
-        void CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, float& min_damage, float& max_damage);
+        void CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, float& min_damage, float& max_damage, uint8 index = 0);
 
         void UpdateDefenseBonusesMod();
         float GetMeleeCritFromAgility() const;
@@ -1639,7 +1645,7 @@ class Player : public Unit
 
         void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const override;
         void DestroyForPlayer(Player* target) const override;
-        void SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 RestXP) const;
+        void SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 RestXP, float groupRate) const;
 
         uint8 LastSwingErrorMsg() const { return m_swingErrorMsg; }
         void SwingErrorMsg(uint8 val) { m_swingErrorMsg = val; }
@@ -1711,16 +1717,18 @@ class Player : public Unit
         void UpdateWeaponSkill(WeaponAttackType attType);
         void UpdateCombatSkills(Unit* pVictim, WeaponAttackType attType, bool defence);
 
+        bool HasSkill(uint16 id) const;
         void SetSkill(uint16 id, uint16 currVal, uint16 maxVal, uint16 step = 0);
-        uint16 GetMaxSkillValue(uint32 skill) const;        // max + perm. bonus + temp bonus
-        uint16 GetPureMaxSkillValue(uint32 skill) const;    // max
-        uint16 GetSkillValue(uint32 skill) const;           // skill value + perm. bonus + temp bonus
-        uint16 GetBaseSkillValue(uint32 skill) const;       // skill value + perm. bonus
-        uint16 GetPureSkillValue(uint32 skill) const;       // skill value
-        int16 GetSkillPermBonusValue(uint32 skill) const;
-        int16 GetSkillTempBonusValue(uint32 skill) const;
-        bool HasSkill(uint32 skill) const;
-        void learnSkillRewardedSpells(uint32 skill_id, uint32 skill_value);
+        uint16 GetSkill(uint16 id, bool bonusPerm, bool bonusTemp, bool max = false) const;
+        inline uint16 GetSkillValue(uint16 id) const { return GetSkill(id, true, true); }           // skill value + perm. bonus + temp bonus
+        inline uint16 GetSkillValueBase(uint16 id) const { return GetSkill(id, true, false); }      // skill value + perm. bonus
+        inline uint16 GetSkillValuePure(uint16 id) const { return GetSkill(id, false, false); }     // skill value
+        inline uint16 GetSkillMax(uint16 id) const { return GetSkill(id, true, true, true); }       // skill max + perm. bonus + temp bonus
+        inline uint16 GetSkillMaxPure(uint16 id) const { return GetSkill(id, false, false, true); } // skill max
+        bool ModifySkillBonus(uint16 id, int16 diff, bool permanent = false);
+        int16 GetSkillBonus(uint16 id, bool permanent = false) const;
+        inline int16 GetSkillBonusPermanent(uint16 id) const { return GetSkillBonus(id, true); }   // skill perm. bonus
+        inline int16 GetSkillBonusTemporary(uint16 id) const { return GetSkillBonus(id); }         // skill temp bonus
 
         WorldLocation& GetTeleportDest() { return m_teleport_dest; }
         bool IsBeingTeleported() const { return mSemaphoreTeleport_Near || mSemaphoreTeleport_Far; }
@@ -1749,14 +1757,13 @@ class Player : public Unit
 
         ReputationMgr&       GetReputationMgr()       { return m_reputationMgr; }
         ReputationMgr const& GetReputationMgr() const { return m_reputationMgr; }
-        ReputationRank GetReputationRank(uint32 faction) const;
-        void RewardReputation(Unit* pVictim, float rate);
+        ReputationRank GetReputationRank(uint32 faction_id) const;
+        void RewardReputation(Creature* victim, float rate);
         void RewardReputation(Quest const* pQuest);
         int32 CalculateReputationGain(ReputationSource source, int32 rep, int32 maxRep, int32 faction, uint32 creatureOrQuestLevel = 0, bool noAuraBonus = false);
 
         void UpdateSkillsForLevel();
         void UpdateSkillsToMaxSkillsForLevel();             // for .levelup
-        void ModifySkillBonus(uint32 skillid, int32 val, bool talent);
 
         /*********************************************************/
         /***                  PVP SYSTEM                       ***/
@@ -2061,7 +2068,7 @@ class Player : public Unit
         void ResummonPetTemporaryUnSummonedIfAny();
         bool IsPetNeedBeTemporaryUnsummoned() const;
 
-        void SendCinematicStart(uint32 CinematicSequenceId) const;
+        void SendCinematicStart(uint32 CinematicSequenceId);
 
         /*********************************************************/
         /***                 INSTANCE SYSTEM                   ***/
@@ -2101,8 +2108,6 @@ class Player : public Unit
         uint8 GetSubGroup() const { return m_group.getSubGroup(); }
         uint32 GetGroupUpdateFlag() const { return m_groupUpdateMask; }
         void SetGroupUpdateFlag(uint32 flag) { m_groupUpdateMask |= flag; }
-        const uint64& GetAuraUpdateMask() const { return m_auraUpdateMask; }
-        void SetAuraUpdateMask(uint8 slot) { m_auraUpdateMask |= (uint64(1) << slot); }
         Player* GetNextRaidMemberWithLowestLifePercentage(float radius, AuraType noAuraType);
         PartyResult CanUninviteFromGroup() const;
         void UpdateGroupLeaderFlag(const bool remove = false);
@@ -2122,6 +2127,7 @@ class Player : public Unit
         bool HasTitle(CharTitlesEntry const* title) const { return HasTitle(title->bit_index); }
         void SetTitle(uint32 titleId, bool lost = false);
         void SetTitle(CharTitlesEntry const* title, bool lost = false);
+        void SaveTitles(); // optimization for arena rewards
 
         virtual UnitAI* AI() override { if (m_charmInfo) return m_charmInfo->GetAI(); return nullptr; }
         virtual CombatData* GetCombatData() override { if (m_charmInfo && m_charmInfo->GetCombatData()) return m_charmInfo->GetCombatData(); return m_combatData; }
@@ -2158,6 +2164,7 @@ class Player : public Unit
             }
         }
 
+        void UpdateEverything();
 #ifdef ENABLE_PLAYERBOTS
         //EquipmentSets& GetEquipmentSets() { return m_EquipmentSets; }
         void SetPlayerbotAI(PlayerbotAI* ai) { assert(!m_playerbotAI && !m_playerbotMgr); m_playerbotAI = ai; }
@@ -2363,7 +2370,6 @@ class Player : public Unit
         GroupReference m_originalGroup;
         Group* m_groupInvite;
         uint32 m_groupUpdateMask;
-        uint64 m_auraUpdateMask;
 
         // Player summoning
         time_t m_summon_expire;
@@ -2379,6 +2385,8 @@ class Player : public Unit
         InventoryResult _CanStoreItem_InBag(uint8 bag, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool merge, bool non_specialized, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot) const;
         InventoryResult _CanStoreItem_InInventorySlots(uint8 slot_begin, uint8 slot_end, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool merge, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot) const;
         Item* _StoreItem(uint16 pos, Item* pItem, uint32 count, bool clone, bool update);
+
+        CinematicMgrUPtr m_cinematicMgr;
 
         void AdjustQuestReqItemCount(Quest const* pQuest, QuestStatusData& questStatusData);
 
