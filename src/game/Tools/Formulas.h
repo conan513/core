@@ -20,6 +20,8 @@
 #define MANGOS_FORMULAS_H
 
 #include "World/World.h"
+#include "PlayerbotAIConfig.h"
+#include "RandomPlayerbotMgr.h"
 
 namespace MaNGOS
 {
@@ -144,6 +146,11 @@ namespace MaNGOS
                 else
                     xp_gain *= 2;
             }
+
+			if (player->GetPlayerbotAI())
+			{
+				xp_gain *= sPlayerbotAIConfig.playerbotsXPrate;
+			}
 
             xp_gain *= target->GetCreatureInfo()->ExperienceMultiplier;
 
