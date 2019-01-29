@@ -147,7 +147,7 @@ namespace MaNGOS
                     xp_gain *= 2;
             }
 
-			if (player->GetPlayerbotAI())
+			if (sRandomPlayerbotMgr.IsRandomBot(player) && !player->GetGroup())
 			{
 				xp_gain *= sPlayerbotAIConfig.playerbotsXPrate;
 			}
