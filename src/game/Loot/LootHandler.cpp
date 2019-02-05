@@ -38,7 +38,7 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
     if (!loot)
     {
-        sLog.outError("HandleAutostoreLootItemOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
+        sLog.outDebug("HandleAutostoreLootItemOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
         return;
     }
 
@@ -78,7 +78,7 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket& /*recv_data*/)
 
     if (!pLoot)
     {
-        sLog.outError("HandleLootMoneyOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
+        sLog.outDebug("HandleLootMoneyOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
         return;
     }
 
@@ -133,7 +133,7 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
     if (!target)
     {
         _player->SendLootError(lootguid, LOOT_ERROR_PLAYER_NOT_FOUND);
-        sLog.outError("WorldSession::HandleLootMasterGiveOpcode> Cannot retrieve target %s", targetGuid.GetString().c_str());
+        sLog.outDebug("WorldSession::HandleLootMasterGiveOpcode> Cannot retrieve target %s", targetGuid.GetString().c_str());
         return;
     }
 
@@ -143,21 +143,21 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
 
     if (!pLoot)
     {
-        sLog.outError("WorldSession::HandleLootMasterGiveOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
+        sLog.outDebug("WorldSession::HandleLootMasterGiveOpcode> Cannot retrieve loot for player %s", _player->GetGuidStr().c_str());
         return;
     }
 
     if (_player->GetObjectGuid() != pLoot->GetMasterLootGuid())
     {
         _player->SendLootError(lootguid, LOOT_ERROR_DIDNT_KILL);
-        sLog.outError("WorldSession::HandleLootMasterGiveOpcode> player %s is not the loot master!", _player->GetGuidStr().c_str());
+        sLog.outDebug("WorldSession::HandleLootMasterGiveOpcode> player %s is not the loot master!", _player->GetGuidStr().c_str());
         return;
     }
 
     if (!_player->IsInGroup(target) || !_player->IsInMap(target))
     {
         _player->SendLootError(lootguid, LOOT_ERROR_MASTER_OTHER);
-        sLog.outError("WorldSession::HandleLootMasterGiveOpcode> Player %s tried to give an item to ineligible player %s !", _player->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+        sLog.outDebug("WorldSession::HandleLootMasterGiveOpcode> Player %s tried to give an item to ineligible player %s !", _player->GetGuidStr().c_str(), target->GetGuidStr().c_str());
         return;
     }
 
